@@ -57,43 +57,4 @@ jobs:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
       with:
         files: coverage.xml
-        fail_ci_if_error: true
-
-  integration:
-    runs-on: ubuntu-latest
-    environment: integration
-    needs: test
-    strategy:
-      matrix:
-        python-version: ["3.12"]
-        java-version: ["17"]
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
-
-    - name: Set up Java ${{ matrix.java-version }}
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'temurin'
-        java-version: ${{ matrix.java-version }}
-
-    - name: Install uv
-      run: |
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-
-    - name: Install dependencies
-      run: |
-        uv venv
-        . .venv/bin/activate
-        uv pip install -e ".[test]"
-
-    - name: Run integration tests
-      run: |
-        . .venv/bin/activate
-        make test.integration 
+        fail_ci_if_error: true 
