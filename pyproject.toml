@@ -1,0 +1,28 @@
+[project]
+name = "qi"
+version = "0.1.0"
+description = "Smart OpenAPI Generator proxy for Java Spring Boot projects"
+requires-python = ">=3.10"
+authors = [
+    {name = "QI Contributors", email = ""}
+]
+dependencies = [
+    "typer>=0.9.0",
+    "rich>=13.7.0",
+    "pyyaml>=6.0.1",
+    "requests>=2.31.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/nicksenap/qi"
+Repository = "https://github.com/nicksenap/qi"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["qi"]
+
+[project.scripts]
+qi = "qi.cli:app"
