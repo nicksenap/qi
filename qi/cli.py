@@ -1,13 +1,15 @@
-import typer
 from pathlib import Path
-from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
+
+import typer
 from rich import print as rprint
-from typing import Optional
-from .generator import OpenAPIGenerator
+from rich.console import Console
+from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn
+
 from .config import Config
+from .generator import OpenAPIGenerator
 
 console = Console()
+
 
 def create_progress() -> Progress:
     return Progress(
@@ -18,15 +20,18 @@ def create_progress() -> Progress:
         console=console,
     )
 
+
 def version_callback(value: bool):
     if value:
         rprint("[green]QI version 0.1.0[/]")
         raise typer.Exit()
 
+
 app = typer.Typer(
     help="[bold]QI[/] - Smart OpenAPI Generator proxy for Java Spring Boot projects",
     rich_markup_mode="rich",
 )
+
 
 @app.callback()
 def main(
@@ -44,6 +49,7 @@ def main(
     """
     pass
 
+
 @app.command()
 def generate(
     spec_file: Path = typer.Argument(
@@ -54,7 +60,7 @@ def generate(
         file_okay=True,
         resolve_path=True,
     ),
-    config: Optional[Path] = typer.Option(
+    config: Path | None = typer.Option(
         None,
         "--config",
         "-c",
@@ -80,15 +86,16 @@ def generate(
         with create_progress() as progress:
             download_task = progress.add_task("[cyan]Downloading OpenAPI Generator...", total=None)
             generator.download_generator_with_progress(progress, download_task)
-            
+
             generate_task = progress.add_task("[yellow]Generating code...", total=None)
             generator.generate_with_progress(str(spec_file), str(output), progress, generate_task)
 
         rprint("[bold green]✓[/] Code generation completed successfully!")
-        
+
     except Exception as e:
-        console.print(f"[bold red]Error:[/] {str(e)}")
-        raise typer.Exit(1)
+        console.print(f"[bold red]Error:[/] {e!s}")
+        raise typer.Exit(1) from e
+
 
 if __name__ == "__main__":
-    app() 
+    app()

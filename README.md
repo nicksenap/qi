@@ -1,5 +1,8 @@
 # QI - Smart OpenAPI Generator Proxy
 
+[![Test](https://github.com/nicksenap/qi/actions/workflows/test.yml/badge.svg)](https://github.com/nicksenap/qi/actions/workflows/test.yml)
+[![codecov](https://codecov.io/gh/nicksenap/qi/branch/main/graph/badge.svg)](https://codecov.io/gh/nicksenap/qi)
+
 QI is a smart proxy for OpenAPI Generator that helps manage generated Java Spring Boot code with custom directory mappings.
 
 ## Features
@@ -59,8 +62,28 @@ components:
       properties:
         id:
           type: string
+          format: uuid
         name:
           type: string
+```
+
+## Development
+
+### Setup
+
+```bash
+# Install development dependencies
+make install.dev
+
+# Run tests
+make test          # All tests
+make test.unit     # Unit tests only
+make test.integration  # Integration tests only
+
+# Code quality
+make lint          # Check code style
+make fix           # Auto-fix code style issues
+make check         # Run all quality checks
 ```
 
 ## Requirements
