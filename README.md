@@ -1,17 +1,16 @@
-# QI - Smart OpenAPI Generator Proxy
+# Qi - Better Workflow for Contract-Based Development
 
 [![Test](https://github.com/nicksenap/qi/actions/workflows/test.yml/badge.svg)](https://github.com/nicksenap/qi/actions/workflows/test.yml)
 [![codecov](https://codecov.io/gh/nicksenap/qi/branch/main/graph/badge.svg)](https://codecov.io/gh/nicksenap/qi)
 
-QI is a smart proxy for OpenAPI Generator that helps manage generated Java Spring Boot code with custom directory mappings.
+Qi is a tool that enhances contract-based development workflow by providing more intelligent code generation from OpenAPI specifications. Currently supporting Java Spring Boot, with planned support for FastAPI and other frameworks.
 
 ## Features
 
 - Automatically downloads and manages OpenAPI Generator CLI
 - Supports custom directory mapping via `x-qi-dir` extension
 - Tracks generated files for smart updates
-- Supports Java Spring Boot projects
-- Beautiful CLI with progress bars and color output
+- Currently supports Java Spring Boot projects (FastAPI and other frameworks coming soon)
 
 ## Installation
 
