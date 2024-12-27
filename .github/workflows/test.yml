@@ -38,7 +38,7 @@ jobs:
         uv venv
         . .venv/bin/activate
         uv pip install -e ".[test]"
-        uv pip install ruff
+        uv pip install ruff coverage
 
     - name: Run linting
       run: |
@@ -49,13 +49,14 @@ jobs:
       run: |
         . .venv/bin/activate
         make test.cov
+        coverage xml
 
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v4
       env:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
       with:
-        files: .coverage
+        files: coverage.xml
         fail_ci_if_error: true
 
   integration:
