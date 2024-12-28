@@ -55,6 +55,41 @@ def check_operation_ids(spec: dict[str, Any]) -> list[str]:
     return errors
 
 
+# Constants for path validation
+MIN_SCHEMA_PATH_PARTS = 2  # components/schemas requires at least 2 parts
+
+
+def check_inline_models(spec: dict[str, Any]) -> list[str]:
+    """Check for inline models in the spec."""
+    errors = []
+
+    def check_node(node: Any, path: str = "") -> None:
+        if isinstance(node, dict):
+            # Check if this is a schema definition
+            if "type" in node and node["type"] == "object" and "properties" in node:
+                # This is an inline model - allow it in components/schemas
+                path_parts = [p for p in path.split("/") if p]
+                if (
+                    len(path_parts) >= MIN_SCHEMA_PATH_PARTS
+                    and path_parts[0] == "components"
+                    and path_parts[1] == "schemas"
+                ):
+                    return
+                errors.append(f"Inline model found at {path}")
+
+            # Recursively check all children
+            for key, value in node.items():
+                new_path = f"{path}/{key}" if path else key
+                check_node(value, new_path)
+        elif isinstance(node, list):
+            # Check array items
+            for i, item in enumerate(node):
+                check_node(item, f"{path}[{i}]")
+
+    check_node(spec)
+    return errors
+
+
 # Default custom rules
 DEFAULT_RULES = [
     CustomRule(
@@ -66,6 +101,11 @@ DEFAULT_RULES = [
         "operation-ids",
         "All operations must have an operationId",
         check_operation_ids,
+    ),
+    CustomRule(
+        "no-inline-models",
+        "All models must be defined in components/schemas",
+        check_inline_models,
     ),
 ]
 
