@@ -88,7 +88,8 @@ class OpenAPIGenerator:
 
         # Generate code
         progress.update(task_id, description="[yellow]Running OpenAPI Generator...")
-        jar_path = f"openapi-generator-cli-{self.config.openapi_generator_version}.jar"
+        jar_name = f"openapi-generator-cli-{self.config.openapi_generator_version}.jar"
+        jar_path = os.path.join(self.config.qi_dir, jar_name)
         cmd = [
             "java",
             "-jar",

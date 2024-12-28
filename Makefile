@@ -69,6 +69,9 @@ clean:
 # Deep clean, remove the virtual environment, for local development
 deep-clean: clean clean.artifact
 	rm -rf $(VENV)/
+	find . -type d -name ".qi" -exec rm -rf {} +
+	find . -name ".qi-tracking.yaml" -delete
+	find . -name "openapi-generator-cli-6.6.0.jar" -delete
 
 # Build package
 build: clean
@@ -82,9 +85,12 @@ check: clean lint test
 run.artifact:
 	cd $(ARTIFACT_PATH) && mvn spring-boot:run
 
+build.artifact:
+	cd $(ARTIFACT_PATH) && mvn clean package -DskipTests
+
 # Default target
 all: clean install.dev lint test 
 
 run.all: deep-clean install.dev
-	cd playground && qi generate specs/merchant_annotated.yaml -o out
-	$(MAKE) run.artifact 
+	cd playground && source ../.venv/bin/activate && qi generate specs/merchant_annotated.yaml -o out --verbose
+	$(MAKE) build.artifact
