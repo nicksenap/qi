@@ -13,6 +13,12 @@ wheels/
 temp_generated/
 playground/
 .*-tracking.yaml
+*_cache
 
 # oas generator
 openapi-generator-cli-*.jar
+
+# codecov
+.codecov.yml
+.codecov
+.coverage

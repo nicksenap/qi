@@ -97,5 +97,69 @@ def generate(
         raise typer.Exit(1) from e
 
 
+def validate_version(value: str) -> str:
+    """Validate the OpenAPI version."""
+    if value not in ["2", "3"]:
+        raise typer.BadParameter('Version must be either "2" or "3"')
+    return value
+
+
+@app.command()
+def convert(
+    spec_file: Path = typer.Argument(
+        ...,
+        help="Path to OpenAPI specification file",
+        exists=True,
+        dir_okay=False,
+        file_okay=True,
+        resolve_path=True,
+    ),
+    target_version: str = typer.Option(
+        ...,
+        "--to",
+        "-t",
+        help="Target OpenAPI version (2 or 3)",
+        callback=validate_version,
+    ),
+    output: Path | None = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Output file path (optional)",
+    ),
+    config: Path | None = typer.Option(
+        None,
+        "--config",
+        "-c",
+        help="Path to configuration file",
+        exists=True,
+        dir_okay=False,
+        file_okay=True,
+    ),
+):
+    """Convert OpenAPI specification between versions 2 and 3."""
+    try:
+        with console.status("[bold green]Loading configuration...") as status:
+            config_obj = Config.load(str(config)) if config else Config.default()
+            generator = OpenAPIGenerator(config_obj)
+            status.update("[bold green]Configuration loaded successfully!")
+
+        with create_progress() as progress:
+            convert_task = progress.add_task("[cyan]Converting specification...", total=None)
+            output_file = generator.convert_spec_version(
+                str(spec_file),
+                target_version,
+                str(output) if output else None,
+                progress,
+                convert_task,
+            )
+
+        rprint(f"[bold green]✓[/] Specification converted successfully to: {output_file}")
+
+    except Exception as e:
+        console.print(f"[bold red]Error:[/] {e!s}")
+        raise typer.Exit(1) from e
+
+
 if __name__ == "__main__":
     app()
