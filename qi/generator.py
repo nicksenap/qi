@@ -88,17 +88,29 @@ class OpenAPIGenerator:
             "spring",
             "-o",
             temp_dir,
-            "--api-package",
-            f"{self.config.java_package_base}.{self.config.api_package}",
-            "--model-package",
-            f"{self.config.java_package_base}.{self.config.model_package}",
         ]
+
+        # Add additional properties
+        additional_properties = {
+            "java8": str(self.config.use_java8).lower(),
+            "artifactId": self.config.artifact_id,
+            "groupId": f"com.{self.config.organization}.{self.config.artifact_id}",
+            "artifactVersion": self.config.artifact_version,
+            "apiPackage": f"com.{self.config.organization}.{self.config.artifact_id}.api",
+            "modelPackage": f"com.{self.config.organization}.{self.config.artifact_id}.model",
+            "useTags": str(self.config.use_tags).lower(),
+            "useSpringBoot3": str(self.config.use_spring_boot3).lower(),
+        }
+
+        for key, value in additional_properties.items():
+            cmd.append(f"--additional-properties={key}={value}")
+
         subprocess.run(cmd, check=True, capture_output=True)
 
         # Process generated files
         progress.update(task_id, description="[yellow]Processing generated files...")
         model_dir = os.path.join(
-            temp_dir, "src/main/java", self.config.java_package_base.replace(".", "/"), self.config.model_package
+            temp_dir, "src/main/java", "com", self.config.organization, self.config.artifact_id, "model"
         )
 
         for file_name in os.listdir(model_dir):

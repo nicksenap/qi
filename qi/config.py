@@ -10,6 +10,12 @@ class Config:
     model_package: str
     api_package: str
     tracking_file: str
+    artifact_id: str
+    organization: str
+    artifact_version: str
+    use_java8: bool
+    use_spring_boot3: bool
+    use_tags: bool
 
     @classmethod
     def load(cls, config_path: str) -> "Config":
@@ -22,6 +28,12 @@ class Config:
             model_package=data.get("model_package", "model"),
             api_package=data.get("api_package", "api"),
             tracking_file=data.get("tracking_file", ".qi-tracking.yaml"),
+            artifact_id=data.get("artifact_id", "service"),
+            organization=data.get("organization", "qi"),
+            artifact_version=data.get("artifact_version", "0.0.1"),
+            use_java8=data.get("use_java8", True),
+            use_spring_boot3=data.get("use_spring_boot3", True),
+            use_tags=data.get("use_tags", True),
         )
 
     @classmethod
@@ -33,6 +45,12 @@ class Config:
             model_package="model",
             api_package="api",
             tracking_file=".qi-tracking.yaml",
+            artifact_id="service",
+            organization="qi",
+            artifact_version="0.0.1",
+            use_java8=True,
+            use_spring_boot3=True,
+            use_tags=True,
         )
 
     def save(self, path: str):
@@ -43,6 +61,12 @@ class Config:
             "model_package": self.model_package,
             "api_package": self.api_package,
             "tracking_file": self.tracking_file,
+            "artifact_id": self.artifact_id,
+            "organization": self.organization,
+            "artifact_version": self.artifact_version,
+            "use_java8": self.use_java8,
+            "use_spring_boot3": self.use_spring_boot3,
+            "use_tags": self.use_tags,
         }
         with open(path, "w") as f:
             yaml.dump(data, f)
