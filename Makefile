@@ -56,6 +56,7 @@ clean:
 	rm -rf .ruff_cache/
 	rm -rf temp_generated/
 	rm -rf openapi-generator-cli-*.jar
+	rm -rf $(VENV)/
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete
 
