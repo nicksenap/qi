@@ -7,6 +7,7 @@ from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn
 
 from .config import Config
 from .generator import OpenAPIGenerator
+from .linter import lint_specs
 
 console = Console()
 
@@ -23,12 +24,12 @@ def create_progress() -> Progress:
 
 def version_callback(value: bool):
     if value:
-        rprint("[green]QI version 0.1.0[/]")
+        rprint("[green]Qi version 0.1.0[/]")
         raise typer.Exit()
 
 
 app = typer.Typer(
-    help="[bold]QI[/] - Smart OpenAPI Generator proxy for Java Spring Boot projects",
+    help="[bold]Qi[/] - Better Workflow for Contract-Based Development",
     rich_markup_mode="rich",
 )
 
@@ -45,7 +46,8 @@ def main(
     ),
 ):
     """
-    [bold]QI[/] helps you manage OpenAPI generated code in your Java Spring Boot project.
+    [bold]Qi[/] enhances contract-based development workflow by providing more intelligent code
+    generation from OpenAPI specifications.
     """
     pass
 
@@ -156,6 +158,35 @@ def convert(
 
         rprint(f"[bold green]✓[/] Specification converted successfully to: {output_file}")
 
+    except Exception as e:
+        console.print(f"[bold red]Error:[/] {e!s}")
+        raise typer.Exit(1) from e
+
+
+@app.command()
+def lint(
+    spec_files: list[Path] = typer.Argument(
+        ...,
+        help="Paths to OpenAPI specification files",
+        exists=True,
+        dir_okay=False,
+        file_okay=True,
+        resolve_path=True,
+    ),
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        "-v",
+        help="Show detailed validation messages",
+    ),
+):
+    """Lint OpenAPI specification files for validation errors."""
+    try:
+        is_valid = lint_specs(spec_files, verbose)
+        if is_valid:
+            rprint("[bold green]✓[/] All specifications are valid!")
+        else:
+            raise typer.Exit(1)
     except Exception as e:
         console.print(f"[bold red]Error:[/] {e!s}")
         raise typer.Exit(1) from e

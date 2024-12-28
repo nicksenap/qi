@@ -2,75 +2,25 @@ openapi: 3.0.0
 info:
   title: Test API
   version: 1.0.0
-  description: Test API for QI
 paths:
-  /users:
+  /test:
     get:
-      summary: Get all users
+      summary: Test endpoint
+      tags: [test]
+      operationId: testEndpoint
       responses:
         '200':
-          description: List of users
+          description: OK
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/User'
-    post:
-      summary: Create a user
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/User'
-      responses:
-        '201':
-          description: User created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/User'
-  /orders:
-    get:
-      summary: Get all orders
-      responses:
-        '200':
-          description: List of orders
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Order'
+                $ref: '#/components/schemas/TestResponse'
 components:
   schemas:
-    User:
-      x-qi-dir: "domain/user/model"
+    TestResponse:
       type: object
       properties:
         id:
           type: string
           format: uuid
-          description: The user's unique identifier
-        name:
-          type: string
-          description: The user's name
-      required:
-        - id
-        - name
-    Order:
-      x-qi-dir: "domain/order/model"
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-          description: The order's unique identifier
-        userId:
-          type: string
-          format: uuid
-          description: The ID of the user who placed the order
-      required:
-        - id
-        - userId 
+          description: The test ID 

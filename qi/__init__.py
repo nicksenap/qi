@@ -1,4 +1,4 @@
-"""QI - Smart OpenAPI Generator proxy for Java Spring Boot projects."""
+"""Qi - Smart OpenAPI Generator proxy for Java Spring Boot projects."""
 
 from .cli import app
 from .config import Config

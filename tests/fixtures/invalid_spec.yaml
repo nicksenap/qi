@@ -1,0 +1,29 @@
+openapi: 3.0.0
+info:
+  # Missing required title field
+  version: 1.0.0
+paths:
+  /users:
+    get:
+      # Missing required responses field
+      summary: List users
+    post:
+      responses:
+        '200':
+          # Invalid response object (missing description)
+          content:
+            application/json:
+              schema:
+                # Invalid reference
+                $ref: '#/components/schemas/NonExistentModel'
+components:
+  schemas:
+    User:
+      # Invalid type field
+      type: invalid_type
+      properties:
+        id:
+          type: integer
+        name:
+          # Missing type field
+          required: true 

@@ -1,10 +1,10 @@
 [project]
 name = "qi"
 version = "0.1.0"
-description = "Smart OpenAPI Generator proxy for Java Spring Boot projects"
+description = "Qi - Better Workflow for Contract-Based Development"
 requires-python = ">=3.10"
 authors = [
-    {name = "QI Contributors", email = ""}
+    {name = "Nick Song", email = "nsong81@gmail.com"}
 ]
 dependencies = [
     "typer>=0.15.1",

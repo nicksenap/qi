@@ -1,21 +1,21 @@
 import os
 import shutil
 import subprocess
-import tempfile
 from typing import Any, Literal
 
 import requests
 import yaml
-from apispec import APISpec
 from rich.progress import Progress, TaskID
 
 from .config import Config
+from .converter import OpenAPIConverter
 
 
 class OpenAPIGenerator:
     def __init__(self, config: Config):
         self.config = config
         self.tracking_data = self._load_tracking()
+        self.converter = OpenAPIConverter()
 
     def _load_tracking(self) -> dict[str, str]:
         """Load tracking data from file."""
@@ -149,15 +149,6 @@ class OpenAPIGenerator:
 
         progress.update(task_id, description="[green]Generation completed!")
 
-    def _convert_schemas(self, spec_data: dict, target_version: str, spec: APISpec) -> None:
-        """Convert schemas between OpenAPI versions."""
-        if target_version == "3" and "definitions" in spec_data:
-            for name, schema in spec_data["definitions"].items():
-                spec.components.schema(name, schema)
-        elif target_version == "2" and "components" in spec_data and "schemas" in spec_data["components"]:
-            for name, schema in spec_data["components"]["schemas"].items():
-                spec.components.schema(name, schema)
-
     def convert_spec_version(
         self,
         spec_file: str,
@@ -167,44 +158,5 @@ class OpenAPIGenerator:
         task_id: TaskID | None = None,
     ) -> str:
         """Convert OpenAPI specification between versions 2 and 3."""
-        if progress and task_id:
-            progress.update(task_id, description=f"[yellow]Converting specification to version {target_version}...")
-
-        with open(spec_file) as f:
-            spec_data = yaml.safe_load(f)
-
-        current_version = "2" if spec_data.get("swagger") == "2.0" else "3"
-        if current_version == target_version:
-            if progress and task_id:
-                progress.update(task_id, description="[green]Specification already in target version")
-            if output_file:
-                shutil.copy2(spec_file, output_file)
-                return output_file
-            return spec_file
-
-        openapi_version = "2.0" if target_version == "2" else "3.0.0"
-        spec = APISpec(
-            title=spec_data.get("info", {}).get("title", "Converted API"),
-            version=spec_data.get("info", {}).get("version", "1.0.0"),
-            openapi_version=openapi_version,
-        )
-
-        if "paths" in spec_data:
-            for path, path_item in spec_data["paths"].items():
-                spec.path(path=path, operations=path_item)
-
-        self._convert_schemas(spec_data, target_version, spec)
-        converted_dict = spec.to_dict()
-
-        if target_version == "2" and "components" in converted_dict and "schemas" in converted_dict["components"]:
-            converted_dict["definitions"] = converted_dict["components"]["schemas"]
-            del converted_dict["components"]
-
-        output_file = output_file or tempfile.mktemp(suffix=".yaml")
-        with open(output_file, "w") as f:
-            yaml.dump(converted_dict, f)
-
-        if progress and task_id:
-            progress.update(task_id, description="[green]Conversion completed!")
-
-        return output_file
+        result = self.converter.convert_spec(spec_file, target_version, output_file, progress, task_id)
+        return str(result)

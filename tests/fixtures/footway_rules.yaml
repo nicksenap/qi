@@ -1,0 +1,19 @@
+openapi-rules:
+  - rule: require-operation-id
+    description: All operations must have an operationId
+    check:
+      type: required-field
+      field: operationId
+      location: /paths/*/*
+
+  - rule: require-tags
+    description: All operations must have tags
+    check:
+      type: required-field
+      field: tags
+      location: /paths/*/*
+
+  - rule: no-inline-models
+    description: All models must be defined in components/schemas
+    check:
+      type: no-inline-models 

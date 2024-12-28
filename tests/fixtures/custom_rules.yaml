@@ -1,0 +1,18 @@
+openapi-rules:
+  - rule: require-summary
+    description: All operations must have a summary
+    check:
+      field: summary
+      location: /paths/*/get
+
+  - rule: require-description
+    description: All responses must have a description
+    check:
+      field: description
+      location: /paths/*/get/responses/*
+
+  - rule: require-security
+    description: All operations must have security defined
+    check:
+      field: security
+      location: /paths/*/* 
