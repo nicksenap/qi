@@ -29,11 +29,16 @@ class OpenAPIGenerator:
 
     def _save_tracking(self):
         """Save tracking data to file."""
-        # Merge tracking data from file processor
-        self.tracking_data.update(self.file_processor.tracking_data)
-        os.makedirs(os.path.dirname(self.config.tracking_file), exist_ok=True)
+        # Merge tracking data from file processor's tracking manager
+        self.tracking_data.update(self.file_processor.tracking_manager.tracking_data)
+        tracking_info = {
+            "version": "1.0",
+            "organization": self.config.organization,
+            "artifact_id": self.config.artifact_id,
+            "models": self.tracking_data,
+        }
         with open(self.config.tracking_file, "w") as f:
-            yaml.dump({"models": self.tracking_data}, f)
+            yaml.safe_dump(tracking_info, f)
 
     def download_generator_with_progress(self, progress: Progress, task_id: TaskID) -> str:
         """Download OpenAPI Generator CLI jar with progress reporting."""

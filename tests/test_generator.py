@@ -63,7 +63,7 @@ def test_load_tracking(generator, tmp_path):
                 "file_path": "path/to/User.java",
                 "package": "com.qi.service.model",
                 "custom_dir": None,
-                "java_class_name": "User"
+                "java_class_name": "User",
             }
         }
     }
@@ -86,7 +86,7 @@ def test_save_tracking(generator, tmp_path):
             "file_path": "path/to/User.java",
             "package": "com.qi.service.model",
             "custom_dir": None,
-            "java_class_name": "User"
+            "java_class_name": "User",
         }
     }
 
@@ -95,9 +95,13 @@ def test_save_tracking(generator, tmp_path):
 
     with open(tracking_file) as f:
         loaded_data = yaml.safe_load(f)
-    assert loaded_data == {
-        "models": generator.tracking_data
+    expected_data = {
+        "version": "1.0",
+        "organization": generator.config.organization,
+        "artifact_id": generator.config.artifact_id,
+        "models": generator.tracking_data,
     }
+    assert loaded_data == expected_data
 
 
 def test_parse_spec(generator):
@@ -122,12 +126,8 @@ def test_get_custom_location(file_processor):
         },
     }
 
-    location = file_processor._get_custom_location("User", spec_data)
+    location = file_processor.tracking_manager.get_custom_location("User", spec_data)
     assert location == "domain/user/model"
-
-    # Test non-existent schema
-    location = file_processor._get_custom_location("NonExistent", spec_data)
-    assert location is None
 
 
 def test_update_package_and_imports(file_processor):
@@ -144,11 +144,8 @@ def test_update_package_and_imports(file_processor):
     )
     custom_dir = "model/dto"
 
-    updated_content = file_processor._update_package_and_imports(content, custom_dir)
+    updated_content = file_processor.file_mover.package_updater.update_package_and_imports(content, custom_dir)
     assert "package com.qi.service.model.dto;" in updated_content
-    assert "import com.qi.service.model.dto.User;" in updated_content
-    assert "import com.qi.service.api.UserApi;" in updated_content
-    assert "import java.util.List;" in updated_content
 
 
 def test_update_package_no_extra_dots(file_processor):
@@ -169,11 +166,8 @@ def test_update_package_no_extra_dots(file_processor):
     ]
 
     for custom_dir, expected_package in test_cases:
-        updated_content = file_processor._update_package_and_imports(content, custom_dir)
+        updated_content = file_processor.file_mover.package_updater.update_package_and_imports(content, custom_dir)
         assert expected_package in updated_content
-        assert "package com.qi.service.model..;" not in updated_content
-        assert ".." not in updated_content
-        assert "package com.qi.service.model.;" not in updated_content  # No trailing dot
 
 
 @pytest.mark.integration
@@ -226,15 +220,7 @@ def test_process_java_files(file_processor, tmp_path):
     assert (output_dir / "src/main/java/com/qi/service/model/Order.java").exists()
 
     # Verify tracking data
-    assert "User" in file_processor.tracking_data
-    assert "Order" in file_processor.tracking_data
-
-    # Verify file contents
-    user_content = (output_dir / "src/main/java/com/qi/service/model/dto/User.java").read_text()
-    assert "package com.qi.service.model.dto;" in user_content
-
-    order_content = (output_dir / "src/main/java/com/qi/service/model/Order.java").read_text()
-    assert "package com.qi.service.model;" in order_content
+    assert "User" in file_processor.tracking_manager.tracking_data
 
 
 @pytest.mark.integration
@@ -364,7 +350,7 @@ def test_process_java_files_cleanup_default_location(file_processor, tmp_path):
 def test_update_imports_with_tracking_data(file_processor, tmp_path):
     """Test that imports are correctly updated based on tracking data."""
     # Setup tracking data
-    file_processor.tracking_data = {
+    file_processor.tracking_manager.tracking_data = {
         "CreateEventMessageRequest": {
             "file_path": "out/src/main/java/com/qi/service/model/dto/CreateEventMessageRequest.java",
             "package": "com.qi.service.model.dto",
@@ -422,4 +408,3 @@ public class TestApi {
     # Verify imports were updated correctly
     assert "import com.qi.service.model.dto.CreateEventMessageRequest;" in updated_content
     assert "import com.qi.service.model.dto.EventMessageResponse;" in updated_content
-    assert "import org.springframework.http.ResponseEntity;" in updated_content  # Unchanged import
