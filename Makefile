@@ -49,6 +49,9 @@ fix:
 	$(BIN)/ruff check --fix qi tests
 	$(BIN)/ruff format qi tests
 
+clean.artifact:
+	rm -rf $(ARTIFACT_PATH)
+
 # Clean build artifacts and cache
 clean:
 	rm -rf build/

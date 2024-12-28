@@ -4,7 +4,7 @@ import subprocess
 from dataclasses import dataclass
 from typing import Any
 
-import requests
+import httpx
 import yaml
 from rich.progress import Progress, TaskID
 
@@ -49,17 +49,17 @@ class OpenAPIGenerator:
             return jar_name
 
         url = f"https://repo1.maven.org/maven2/org/openapitools/openapi-generator-cli/{self.config.openapi_generator_version}/openapi-generator-cli-{self.config.openapi_generator_version}.jar"
-        response = requests.get(url, stream=True)
-        total_size = int(response.headers.get("content-length", 0))
 
-        progress.update(task_id, total=total_size)
-        progress.start_task(task_id)
+        with httpx.stream("GET", url) as response:
+            total_size = int(response.headers.get("content-length", 0))
+            progress.update(task_id, total=total_size)
+            progress.start_task(task_id)
 
-        with open(jar_name, "wb") as f:
-            for chunk in response.iter_content(chunk_size=8192):
-                if chunk:
-                    f.write(chunk)
-                    progress.update(task_id, advance=len(chunk))
+            with open(jar_name, "wb") as f:
+                for chunk in response.iter_bytes(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+                        progress.update(task_id, advance=len(chunk))
 
         progress.update(task_id, description="[green]Download completed!")
         return jar_name
