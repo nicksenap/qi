@@ -66,8 +66,8 @@ clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete
 
-# Super clean, remove the virtual environment, for local development
-super-clean: clean
+# Deep clean, remove the virtual environment, for local development
+deep-clean: clean clean.artifact
 	rm -rf $(VENV)/
 
 # Build package
@@ -84,3 +84,7 @@ run.artifact:
 
 # Default target
 all: clean install.dev lint test 
+
+run.all: deep-clean install.dev
+	cd playground && qi generate specs/merchant_annotated.yaml -o out
+	$(MAKE) run.artifact 

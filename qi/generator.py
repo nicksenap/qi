@@ -1,7 +1,6 @@
 import os
 import shutil
 import subprocess
-from dataclasses import dataclass
 from typing import Any
 
 import httpx
@@ -9,25 +8,14 @@ import yaml
 from rich.progress import Progress, TaskID
 
 from .config import Config
-
-
-@dataclass
-class ProcessConfig:
-    """Configuration for processing Java files."""
-
-    source_dir: str
-    output_dir: str
-    file_type: str
-    spec_data: dict
-    progress: Progress
-    task_id: TaskID
-    verbose: bool = False
+from .file_processor import FileProcessor, ProcessConfig
 
 
 class OpenAPIGenerator:
     def __init__(self, config: Config):
         self.config = config
         self.tracking_data = self._load_tracking()
+        self.file_processor = FileProcessor(organization=self.config.organization, artifact_id=self.config.artifact_id)
 
     def _load_tracking(self) -> dict[str, str]:
         """Load tracking data from file."""
@@ -38,6 +26,8 @@ class OpenAPIGenerator:
 
     def _save_tracking(self):
         """Save tracking data to file."""
+        # Merge tracking data from file processor
+        self.tracking_data.update(self.file_processor.tracking_data)
         with open(self.config.tracking_file, "w") as f:
             yaml.dump(self.tracking_data, f)
 
@@ -68,13 +58,6 @@ class OpenAPIGenerator:
         """Parse OpenAPI specification to extract x-qi-dir information."""
         with open(spec_file) as f:
             return yaml.safe_load(f)
-
-    def _get_custom_location(self, schema_name: str, spec_data: dict[str, Any]) -> str | None:
-        """Get custom location for a schema from x-qi-dir."""
-        schemas = spec_data.get("components", {}).get("schemas", {})
-        if schema_name in schemas:
-            return schemas[schema_name].get("x-qi-dir")
-        return None
 
     def generate_with_progress(
         self,
@@ -157,7 +140,7 @@ class OpenAPIGenerator:
         if os.path.exists(model_dir):
             if verbose:
                 print("\nProcessing model files...")
-            self._process_java_files(
+            self.file_processor.process_java_files(
                 ProcessConfig(
                     source_dir=model_dir,
                     output_dir=output_dir,
@@ -174,7 +157,7 @@ class OpenAPIGenerator:
         if os.path.exists(api_dir):
             if verbose:
                 print("\nProcessing API files...")
-            self._process_java_files(
+            self.file_processor.process_java_files(
                 ProcessConfig(
                     source_dir=api_dir,
                     output_dir=output_dir,
@@ -195,51 +178,3 @@ class OpenAPIGenerator:
         shutil.rmtree(temp_dir)
 
         progress.update(task_id, description="[green]Generation completed!")
-
-    def _process_java_files(self, config: ProcessConfig):
-        """Process Java files from a directory."""
-        for file_name in os.listdir(config.source_dir):
-            if not file_name.endswith(".java"):
-                continue
-
-            model_name = file_name[:-5]  # Remove .java extension
-            custom_dir = self._get_custom_location(model_name, config.spec_data)
-            if config.verbose:
-                print(f"Processing {config.file_type} file: {file_name}")
-            config.progress.update(config.task_id, description=f"[yellow]Processing {model_name}...")
-
-            if custom_dir:
-                # Create custom directory if it doesn't exist
-                full_custom_dir = os.path.join(config.output_dir, custom_dir)
-                os.makedirs(full_custom_dir, exist_ok=True)
-
-                source_path = os.path.join(config.source_dir, file_name)
-                target_path = os.path.join(full_custom_dir, file_name)
-
-                if os.path.exists(target_path):
-                    if config.verbose:
-                        print(f"Updating existing file: {file_name}")
-                    config.progress.update(config.task_id, description=f"[yellow]Updating existing file: {file_name}")
-                    # TODO: Implement smart merge for existing files
-                    shutil.copy2(source_path, target_path)
-                else:
-                    if config.verbose:
-                        print(f"Creating new file: {file_name}")
-                    config.progress.update(config.task_id, description=f"[yellow]Creating new file: {file_name}")
-                    shutil.copy2(source_path, target_path)
-
-                # Update tracking
-                self.tracking_data[model_name] = target_path
-            else:
-                # Move to default location
-                default_dir = os.path.join(config.output_dir, config.file_type)
-                os.makedirs(default_dir, exist_ok=True)
-
-                source_path = os.path.join(config.source_dir, file_name)
-                target_path = os.path.join(default_dir, file_name)
-
-                if config.verbose:
-                    print(f"Moving {file_name} to default location: {default_dir}")
-                config.progress.update(config.task_id, description=f"[yellow]Moving {file_name} to default location")
-                shutil.copy2(source_path, target_path)
-                self.tracking_data[model_name] = target_path
