@@ -41,7 +41,9 @@ def file_processor():
 
 def test_load_tracking_empty_file(generator, tmp_path):
     """Test loading tracking data from empty file."""
-    tracking_file = tmp_path / ".qi-tracking.yaml"
+    qi_dir = tmp_path / ".qi"
+    os.makedirs(qi_dir)
+    tracking_file = qi_dir / "tracking.yaml"
     with open(tracking_file, "w") as f:
         f.write("")  # Empty file
 
@@ -52,28 +54,50 @@ def test_load_tracking_empty_file(generator, tmp_path):
 
 def test_load_tracking(generator, tmp_path):
     """Test loading tracking data."""
-    tracking_file = tmp_path / ".qi-tracking.yaml"
-    tracking_data = {"User": "path/to/User.java"}
+    qi_dir = tmp_path / ".qi"
+    os.makedirs(qi_dir)
+    tracking_file = qi_dir / "tracking.yaml"
+    tracking_data = {
+        "models": {
+            "User": {
+                "file_path": "path/to/User.java",
+                "package": "com.qi.service.model",
+                "custom_dir": None,
+                "java_class_name": "User"
+            }
+        }
+    }
     with open(tracking_file, "w") as f:
         yaml.dump(tracking_data, f)
 
     generator.config.tracking_file = str(tracking_file)
     loaded_data = generator._load_tracking()
-    assert loaded_data == tracking_data
+    assert loaded_data == tracking_data["models"]
 
 
 def test_save_tracking(generator, tmp_path):
     """Test saving tracking data."""
-    tracking_file = tmp_path / ".qi-tracking.yaml"
+    qi_dir = tmp_path / ".qi"
+    os.makedirs(qi_dir)
+    tracking_file = qi_dir / "tracking.yaml"
     generator.config.tracking_file = str(tracking_file)
-    generator.tracking_data = {"User": "path/to/User.java"}
+    generator.tracking_data = {
+        "User": {
+            "file_path": "path/to/User.java",
+            "package": "com.qi.service.model",
+            "custom_dir": None,
+            "java_class_name": "User"
+        }
+    }
 
     generator._save_tracking()
     assert tracking_file.exists()
 
     with open(tracking_file) as f:
         loaded_data = yaml.safe_load(f)
-    assert loaded_data == generator.tracking_data
+    assert loaded_data == {
+        "models": generator.tracking_data
+    }
 
 
 def test_parse_spec(generator):

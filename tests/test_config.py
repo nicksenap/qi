@@ -11,7 +11,8 @@ def config_file(tmp_path):
         "java_package_base": "com.test",
         "model_package": "testmodel",
         "api_package": "testapi",
-        "tracking_file": ".test-tracking.yaml",
+        "tracking_file": ".qi/test-tracking.yaml",
+        "qi_dir": ".qi",
     }
     config_path = tmp_path / "test_config.yaml"
     with open(config_path, "w") as f:
@@ -26,7 +27,8 @@ def test_config_load(config_file):
     assert config.java_package_base == "com.test"
     assert config.model_package == "testmodel"
     assert config.api_package == "testapi"
-    assert config.tracking_file == ".test-tracking.yaml"
+    assert config.tracking_file == ".qi/test-tracking.yaml"
+    assert config.qi_dir == ".qi"
 
 
 def test_config_default():
@@ -36,7 +38,8 @@ def test_config_default():
     assert config.java_package_base == "com.example"
     assert config.model_package == "model"
     assert config.api_package == "api"
-    assert config.tracking_file == ".qi-tracking.yaml"
+    assert config.tracking_file == ".qi/tracking.yaml"
+    assert config.qi_dir == ".qi"
 
 
 def test_config_save(tmp_path):

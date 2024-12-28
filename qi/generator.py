@@ -14,6 +14,7 @@ from .file_processor import FileProcessor, ProcessConfig
 class OpenAPIGenerator:
     def __init__(self, config: Config):
         self.config = config
+        os.makedirs(self.config.qi_dir, exist_ok=True)
         self.tracking_data = self._load_tracking()
         self.file_processor = FileProcessor(organization=self.config.organization, artifact_id=self.config.artifact_id)
 
@@ -21,22 +22,26 @@ class OpenAPIGenerator:
         """Load tracking data from file."""
         if os.path.exists(self.config.tracking_file):
             with open(self.config.tracking_file) as f:
-                return yaml.safe_load(f) or {}
+                data = yaml.safe_load(f)
+                if data and isinstance(data, dict):
+                    return data.get("models", {})
         return {}
 
     def _save_tracking(self):
         """Save tracking data to file."""
         # Merge tracking data from file processor
         self.tracking_data.update(self.file_processor.tracking_data)
+        os.makedirs(os.path.dirname(self.config.tracking_file), exist_ok=True)
         with open(self.config.tracking_file, "w") as f:
-            yaml.dump(self.tracking_data, f)
+            yaml.dump({"models": self.tracking_data}, f)
 
     def download_generator_with_progress(self, progress: Progress, task_id: TaskID) -> str:
         """Download OpenAPI Generator CLI jar with progress reporting."""
         jar_name = f"openapi-generator-cli-{self.config.openapi_generator_version}.jar"
-        if os.path.exists(jar_name):
+        jar_path = os.path.join(self.config.qi_dir, jar_name)
+        if os.path.exists(jar_path):
             progress.update(task_id, description="[green]OpenAPI Generator already downloaded")
-            return jar_name
+            return jar_path
 
         url = f"https://repo1.maven.org/maven2/org/openapitools/openapi-generator-cli/{self.config.openapi_generator_version}/openapi-generator-cli-{self.config.openapi_generator_version}.jar"
 
@@ -45,14 +50,14 @@ class OpenAPIGenerator:
             progress.update(task_id, total=total_size)
             progress.start_task(task_id)
 
-            with open(jar_name, "wb") as f:
+            with open(jar_path, "wb") as f:
                 for chunk in response.iter_bytes(chunk_size=8192):
                     if chunk:
                         f.write(chunk)
                         progress.update(task_id, advance=len(chunk))
 
         progress.update(task_id, description="[green]Download completed!")
-        return jar_name
+        return jar_path
 
     def _parse_spec(self, spec_file: str) -> dict[str, Any]:
         """Parse OpenAPI specification to extract x-qi-dir information."""

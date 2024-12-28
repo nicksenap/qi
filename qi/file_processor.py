@@ -27,7 +27,9 @@ class FileProcessor:
         self.organization = organization
         self.artifact_id = artifact_id
         self.tracking_data = {}
-        self.tracking_file = ".qi-tracking.yaml"
+        self.qi_dir = ".qi"
+        self.tracking_file = os.path.join(self.qi_dir, "tracking.yaml")
+        os.makedirs(self.qi_dir, exist_ok=True)
         self._load_tracking_data()
 
     def _load_tracking_data(self):
@@ -36,19 +38,7 @@ class FileProcessor:
             with open(self.tracking_file) as f:
                 data = yaml.safe_load(f)
                 if data:
-                    # Convert any string values to proper dictionaries
-                    models = data.get("models", {})
-                    for model_name, model_info in models.items():
-                        if isinstance(model_info, str):
-                            # Convert old format (just file path) to new format
-                            self.tracking_data[model_name] = {
-                                "file_path": model_info,
-                                "package": f"com.{self.organization}.{self.artifact_id}.model",
-                                "custom_dir": None,
-                                "java_class_name": model_name,
-                            }
-                        else:
-                            self.tracking_data[model_name] = model_info
+                    self.tracking_data = data.get("models", {})
 
     def _save_tracking_data(self):
         """Save tracking data to file."""
