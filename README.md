@@ -3,7 +3,7 @@
 [![Test](https://github.com/nicksenap/qi/actions/workflows/test.yml/badge.svg)](https://github.com/nicksenap/qi/actions/workflows/test.yml)
 [![codecov](https://codecov.io/gh/nicksenap/qi/graph/badge.svg)](https://codecov.io/gh/nicksenap/qi)
 
-Qi is a tool that enhances contract-based development workflow by providing more intelligent code generation from OpenAPI specifications. Currently supporting Java Spring Boot, with planned support for FastAPI and other frameworks.
+Qi (契, means contract in Chinese) is a tool that enhances contract-based development workflow by providing more intelligent code generation from OpenAPI specifications. Currently supporting Java Spring Boot, with planned support for FastAPI and other frameworks.
 
 ## Features
 
