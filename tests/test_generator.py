@@ -131,9 +131,10 @@ def test_generate_with_progress(generator, tmp_path):
     spec_file = FIXTURES_DIR / "test_spec.yaml"
     output_dir = tmp_path / "generated"
     temp_dir = "temp_generated"
-    model_dir = os.path.join(
-        temp_dir, "src/main/java", "com", generator.config.organization, generator.config.artifact_id, "model"
-    )
+    java_path = os.path.join("src/main/java", "com")
+    base_path = os.path.join(temp_dir, java_path, generator.config.organization, generator.config.artifact_id)
+    model_dir = os.path.join(base_path, "model")
+    api_dir = os.path.join(base_path, "api")
 
     # Create test spec data with custom location
     spec_data = {
@@ -158,12 +159,18 @@ def test_generate_with_progress(generator, tmp_path):
         patch("os.makedirs") as mock_makedirs,
         patch("os.listdir") as mock_listdir,
         patch("shutil.copy2") as mock_copy2,
+        patch("shutil.copytree") as mock_copytree,
         patch("shutil.rmtree") as mock_rmtree,
         patch.object(generator, "_parse_spec", return_value=spec_data),
-        patch("os.path.exists", return_value=True),  # Simulate file exists for coverage
+        patch("os.path.exists", return_value=True),
+        patch("os.path.isdir", lambda x: x.endswith("src")),
     ):
         # Setup mocks
-        mock_listdir.return_value = ["User.java", "Order.java"]
+        mock_listdir.side_effect = lambda x: {
+            temp_dir: ["src", "pom.xml", "README.md"],
+            model_dir: ["User.java", "Order.java"],
+            api_dir: ["UserApi.java", "OrderApi.java"],
+        }[x]
 
         # Run the generator
         generator.generate_with_progress(str(spec_file), str(output_dir), progress, task_id)
@@ -180,14 +187,30 @@ def test_generate_with_progress(generator, tmp_path):
 
         # Verify directory creation
         mock_makedirs.assert_any_call(temp_dir, exist_ok=True)
+        mock_makedirs.assert_any_call(os.path.join(output_dir, "model"), exist_ok=True)
+        mock_makedirs.assert_any_call(os.path.join(output_dir, "api"), exist_ok=True)
 
         # Verify file operations
-        mock_listdir.assert_called_once_with(model_dir)
-        assert mock_copy2.call_count == 2  # Two files copied
+        expected_listdir_calls = [
+            ((temp_dir,),),
+            ((model_dir,),),
+            ((api_dir,),),
+        ]
+        assert mock_listdir.call_args_list == expected_listdir_calls
+
+        # Verify copy operations
+        # Should have copied pom.xml and README.md with copy2
+        assert mock_copy2.call_count >= 2  # Non-directory files from temp_dir
+        # Should have copied src directory with copytree
+        mock_copytree.assert_called_once_with(
+            os.path.join(temp_dir, "src"), os.path.join(output_dir, "src"), dirs_exist_ok=True
+        )
 
         # Verify tracking data was updated
         assert "User" in generator.tracking_data
         assert "Order" in generator.tracking_data
+        assert "UserApi" in generator.tracking_data
+        assert "OrderApi" in generator.tracking_data
 
         # Verify cleanup
         mock_rmtree.assert_called_once_with(temp_dir)
@@ -198,9 +221,10 @@ def test_generate_with_progress_no_custom_location(generator, tmp_path):
     spec_file = FIXTURES_DIR / "test_spec.yaml"
     output_dir = tmp_path / "generated"
     temp_dir = "temp_generated"
-    model_dir = os.path.join(
-        temp_dir, "src/main/java", "com", generator.config.organization, generator.config.artifact_id, "model"
-    )
+    java_path = os.path.join("src/main/java", "com")
+    base_path = os.path.join(temp_dir, java_path, generator.config.organization, generator.config.artifact_id)
+    model_dir = os.path.join(base_path, "model")
+    api_dir = os.path.join(base_path, "api")
 
     # Create test spec data without custom location
     spec_data = {
@@ -221,27 +245,45 @@ def test_generate_with_progress_no_custom_location(generator, tmp_path):
         patch("os.makedirs") as mock_makedirs,
         patch("os.listdir") as mock_listdir,
         patch("shutil.copy2") as mock_copy2,
+        patch("shutil.copytree") as mock_copytree,
         patch("shutil.rmtree") as mock_rmtree,
         patch.object(generator, "_parse_spec", return_value=spec_data),
+        patch("os.path.exists", return_value=True),
+        patch("os.path.isdir", lambda x: x.endswith("src")),
     ):
         # Setup mocks
-        mock_listdir.return_value = ["User.java"]
+        mock_listdir.side_effect = lambda x: {
+            temp_dir: ["src", "pom.xml", "README.md"],
+            model_dir: ["User.java"],
+            api_dir: ["UserApi.java"],
+        }[x]
 
         # Run the generator
         generator.generate_with_progress(str(spec_file), str(output_dir), progress, task_id)
 
-        # Verify default directory was created
-        default_dir = os.path.join(output_dir, generator.config.model_package)
-        mock_makedirs.assert_any_call(default_dir, exist_ok=True)
+        # Verify directory creation
+        mock_makedirs.assert_any_call(os.path.join(output_dir, "model"), exist_ok=True)
+        mock_makedirs.assert_any_call(os.path.join(output_dir, "api"), exist_ok=True)
 
-        # Verify file was copied to default location
-        source_path = os.path.join(model_dir, "User.java")
-        target_path = os.path.join(default_dir, "User.java")
-        mock_copy2.assert_any_call(source_path, target_path)
+        # Verify file operations
+        expected_listdir_calls = [
+            ((temp_dir,),),
+            ((model_dir,),),
+            ((api_dir,),),
+        ]
+        assert mock_listdir.call_args_list == expected_listdir_calls
+
+        # Verify copy operations
+        # Should have copied pom.xml and README.md with copy2
+        assert mock_copy2.call_count >= 2  # Non-directory files from temp_dir
+        # Should have copied src directory with copytree
+        mock_copytree.assert_called_once_with(
+            os.path.join(temp_dir, "src"), os.path.join(output_dir, "src"), dirs_exist_ok=True
+        )
 
         # Verify tracking data was updated
         assert "User" in generator.tracking_data
-        assert generator.tracking_data["User"] == target_path
+        assert "UserApi" in generator.tracking_data
 
         # Verify subprocess was called
         mock_run.assert_called_once()
@@ -288,9 +330,10 @@ def test_generate_with_custom_organization_and_artifact(tmp_path):
     generator = OpenAPIGenerator(config)
     output_dir = tmp_path / "output"
     temp_dir = "temp_generated"
-    model_dir = os.path.join(
-        temp_dir, "src/main/java", "com", config.organization, config.artifact_id, "model"
-    )
+    java_path = os.path.join("src/main/java", "com")
+    base_path = os.path.join(temp_dir, java_path, config.organization, config.artifact_id)
+    model_dir = os.path.join(base_path, "model")
+    api_dir = os.path.join(base_path, "api")
 
     progress = MagicMock()
     task_id = 1
@@ -300,12 +343,18 @@ def test_generate_with_custom_organization_and_artifact(tmp_path):
         patch("os.makedirs") as mock_makedirs,
         patch("os.listdir") as mock_listdir,
         patch("shutil.copy2") as mock_copy2,
+        patch("shutil.copytree") as mock_copytree,
         patch("shutil.rmtree") as mock_rmtree,
         patch.object(generator, "_parse_spec", return_value=spec_content),
         patch("os.path.exists", return_value=True),
+        patch("os.path.isdir", lambda x: x.endswith("src")),
     ):
         # Setup mocks
-        mock_listdir.return_value = ["TestModel.java"]
+        mock_listdir.side_effect = lambda x: {
+            temp_dir: ["src", "pom.xml", "README.md"],
+            model_dir: ["TestModel.java"],
+            api_dir: ["TestModelApi.java"],
+        }[x]
 
         # Run the generator
         generator.generate_with_progress(str(spec_file), str(output_dir), progress, task_id)
@@ -327,18 +376,28 @@ def test_generate_with_custom_organization_and_artifact(tmp_path):
 
         # Verify directory creation
         mock_makedirs.assert_any_call(temp_dir, exist_ok=True)
+        mock_makedirs.assert_any_call(os.path.join(output_dir, "model"), exist_ok=True)
+        mock_makedirs.assert_any_call(os.path.join(output_dir, "api"), exist_ok=True)
 
         # Verify file operations
-        mock_listdir.assert_called_once_with(model_dir)
+        expected_listdir_calls = [
+            ((temp_dir,),),
+            ((model_dir,),),
+            ((api_dir,),),
+        ]
+        assert mock_listdir.call_args_list == expected_listdir_calls
 
-        # Verify file was copied to default location
-        source_path = os.path.join(model_dir, "TestModel.java")
-        target_path = os.path.join(output_dir, "model", "TestModel.java")
-        mock_copy2.assert_any_call(source_path, target_path)
+        # Verify copy operations
+        # Should have copied pom.xml and README.md with copy2
+        assert mock_copy2.call_count >= 2  # Non-directory files from temp_dir
+        # Should have copied src directory with copytree
+        mock_copytree.assert_called_once_with(
+            os.path.join(temp_dir, "src"), os.path.join(output_dir, "src"), dirs_exist_ok=True
+        )
 
         # Verify tracking data
         assert "TestModel" in generator.tracking_data
-        assert generator.tracking_data["TestModel"] == target_path
+        assert "TestModelApi" in generator.tracking_data
 
         # Verify cleanup was performed
         mock_rmtree.assert_called_once_with(temp_dir)

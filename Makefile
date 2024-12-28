@@ -5,16 +5,17 @@ PYTHON := python3
 VENV := .venv
 BIN := $(VENV)/bin
 
-# Install production dependencies
-install:
-	uv venv
-	uv pip install .
-
-# Install development dependencies
+# Install development dependencies (use this for development)
 install.dev:
 	uv venv
 	uv pip install -e ".[test]"
 	uv pip install ruff
+	@echo "\nDevelopment installation complete. Changes to source code will be reflected immediately.\n"
+
+# Install production dependencies (use this for production/deployment only)
+install:
+	uv venv
+	uv pip install .
 
 # Run all tests
 test: clean

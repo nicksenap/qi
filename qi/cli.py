@@ -25,7 +25,7 @@ def create_progress() -> Progress:
 
 def version_callback(value: bool):
     if value:
-        rprint("[green]Qi version 0.1.0[/]")
+        rprint("[green]Qi version 0.1.1[/]")
         raise typer.Exit()
 
 
@@ -78,6 +78,11 @@ def generate(
         "-o",
         help="Base output directory",
     ),
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        help="Show detailed output including OpenAPI Generator logs",
+    ),
 ):
     """Generate Java code from OpenAPI specification."""
     try:
@@ -91,7 +96,7 @@ def generate(
             generator.download_generator_with_progress(progress, download_task)
 
             generate_task = progress.add_task("[yellow]Generating code...", total=None)
-            generator.generate_with_progress(str(spec_file), str(output), progress, generate_task)
+            generator.generate_with_progress(str(spec_file), str(output), progress, generate_task, verbose)
 
         rprint("[bold green]✓[/] Code generation completed successfully!")
 
