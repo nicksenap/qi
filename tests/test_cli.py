@@ -31,6 +31,23 @@ def test_generate_command():
         mock_generator.return_value.generate_with_progress.assert_called_once()
 
 
+def test_generate_command_verbose():
+    """Test generate command with verbose flag."""
+    spec_file = FIXTURES_DIR / "test_spec.yaml"
+    with patch("qi.cli.Config") as mock_config, patch("qi.cli.OpenAPIGenerator") as mock_generator:
+        mock_config.default.return_value = mock_config
+        result = runner.invoke(app, ["generate", "--verbose", str(spec_file)])
+        assert result.exit_code == 0
+        mock_generator.assert_called_once_with(mock_config.default.return_value)
+        mock_generator.return_value.generate_with_progress.assert_called_once_with(
+            str(spec_file),
+            "generated",
+            mock_generator.return_value.generate_with_progress.call_args.args[2],  # progress
+            mock_generator.return_value.generate_with_progress.call_args.args[3],  # task_id
+            True,  # verbose
+        )
+
+
 def test_generate_command_with_config():
     """Test generate command with config file."""
     spec_file = FIXTURES_DIR / "test_spec.yaml"

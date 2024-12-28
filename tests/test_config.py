@@ -47,6 +47,12 @@ def test_config_save(tmp_path):
         model_package="testmodel",
         api_package="testapi",
         tracking_file=".test-tracking.yaml",
+        artifact_id="test-service",
+        organization="test",
+        artifact_version="1.0.0",
+        use_java8=True,
+        use_spring_boot3=True,
+        use_tags=True,
     )
 
     save_path = tmp_path / "saved_config.yaml"
