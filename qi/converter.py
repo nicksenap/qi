@@ -91,3 +91,15 @@ class OpenAPIConverter:
             progress.update(task_id, description="[green]Conversion completed!")
 
         return output_file
+
+    def convert_spec_version(
+        self,
+        spec_file: str,
+        target_version: Literal["2", "3"],
+        output_file: str | None = None,
+        progress: Progress | None = None,
+        task_id: TaskID | None = None,
+    ) -> str:
+        """Convert OpenAPI specification between versions 2 and 3."""
+        result = self.convert_spec(spec_file, target_version, output_file, progress, task_id)
+        return str(result)

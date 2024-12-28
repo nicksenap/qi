@@ -1,7 +1,7 @@
 """Tests for CLI functionality."""
 
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 import typer
@@ -85,33 +85,49 @@ def test_generate_command_error():
         assert "Error: Test error" in result.stdout
 
 
-def test_convert_command():
+@patch("qi.cli.Config")
+@patch("qi.cli.OpenAPIConverter")
+def test_convert_command(mock_converter_class, mock_config):
     """Test convert command."""
+    mock_config.default.return_value = MagicMock()
+    mock_converter = MagicMock()
+    mock_converter_class.return_value = mock_converter
+    mock_converter.convert_spec_version.return_value = "output.yaml"
+
     spec_file = FIXTURES_DIR / "test_spec.yaml"
-    with patch("qi.cli.OpenAPIGenerator") as mock_generator:
-        result = runner.invoke(app, ["convert", str(spec_file), "--to", "3"])
-        assert result.exit_code == 0
-        mock_generator.return_value.convert_spec_version.assert_called_once()
+    result = runner.invoke(app, ["convert", str(spec_file), "--to", "3"])
+    assert result.exit_code == 0
+    mock_converter.convert_spec_version.assert_called_once()
 
 
-def test_convert_command_with_output():
+@patch("qi.cli.Config")
+@patch("qi.cli.OpenAPIConverter")
+def test_convert_command_with_output(mock_converter_class, mock_config):
     """Test convert command with output file."""
+    mock_config.default.return_value = MagicMock()
+    mock_converter = MagicMock()
+    mock_converter_class.return_value = mock_converter
+    mock_converter.convert_spec_version.return_value = "custom_output.yaml"
+
     spec_file = FIXTURES_DIR / "test_spec.yaml"
-    output_file = "output.yaml"
-    with patch("qi.cli.OpenAPIGenerator") as mock_generator:
-        result = runner.invoke(app, ["convert", str(spec_file), "--to", "3", "-o", output_file])
-        assert result.exit_code == 0
-        mock_generator.return_value.convert_spec_version.assert_called_once()
+    result = runner.invoke(app, ["convert", str(spec_file), "--to", "3", "--output", "custom_output.yaml"])
+    assert result.exit_code == 0
+    mock_converter.convert_spec_version.assert_called_once()
 
 
-def test_convert_command_error():
+@patch("qi.cli.Config")
+@patch("qi.cli.OpenAPIConverter")
+def test_convert_command_error(mock_converter_class, mock_config):
     """Test convert command with error."""
+    mock_config.default.return_value = MagicMock()
+    mock_converter = MagicMock()
+    mock_converter_class.return_value = mock_converter
+    mock_converter.convert_spec_version.side_effect = Exception("Test error")
+
     spec_file = FIXTURES_DIR / "test_spec.yaml"
-    with patch("qi.cli.OpenAPIGenerator") as mock_generator:
-        mock_generator.return_value.convert_spec_version.side_effect = Exception("Test error")
-        result = runner.invoke(app, ["convert", str(spec_file), "--to", "3"])
-        assert result.exit_code == 1
-        assert "Error: Test error" in result.stdout
+    result = runner.invoke(app, ["convert", str(spec_file), "--to", "3"])
+    assert result.exit_code == 1
+    assert "Error: Test error" in result.output
 
 
 def test_validate_version_invalid():

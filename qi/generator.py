@@ -2,14 +2,13 @@ import os
 import shutil
 import subprocess
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any
 
 import requests
 import yaml
 from rich.progress import Progress, TaskID
 
 from .config import Config
-from .converter import OpenAPIConverter
 
 
 @dataclass
@@ -29,7 +28,6 @@ class OpenAPIGenerator:
     def __init__(self, config: Config):
         self.config = config
         self.tracking_data = self._load_tracking()
-        self.converter = OpenAPIConverter()
 
     def _load_tracking(self) -> dict[str, str]:
         """Load tracking data from file."""
@@ -245,15 +243,3 @@ class OpenAPIGenerator:
                 config.progress.update(config.task_id, description=f"[yellow]Moving {file_name} to default location")
                 shutil.copy2(source_path, target_path)
                 self.tracking_data[model_name] = target_path
-
-    def convert_spec_version(
-        self,
-        spec_file: str,
-        target_version: Literal["2", "3"],
-        output_file: str | None = None,
-        progress: Progress | None = None,
-        task_id: TaskID | None = None,
-    ) -> str:
-        """Convert OpenAPI specification between versions 2 and 3."""
-        result = self.converter.convert_spec(spec_file, target_version, output_file, progress, task_id)
-        return str(result)
