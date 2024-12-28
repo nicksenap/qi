@@ -201,3 +201,20 @@ def test_lint_command_with_invalid_rules():
             assert "Error: Invalid rules file" in result.stdout
     finally:
         rules_file.unlink(missing_ok=True)
+
+
+def test_lint_command_no_rules_file():
+    """Test lint command without a rules file uses DEFAULT_RULES."""
+    spec_file = FIXTURES_DIR / "test_spec.yaml"
+    with patch("qi.cli.lint_specs", return_value=True) as mock_lint:
+        result = runner.invoke(app, ["lint", str(spec_file)])
+        assert result.exit_code == 0
+
+        # Verify that DEFAULT_RULES are used when no rules file is provided
+        mock_lint.assert_called_once()
+        call_args = mock_lint.call_args
+        assert call_args[0][0] == [Path(spec_file)]  # First positional arg (spec_files)
+        assert call_args[0][1] is False  # Second positional arg (verbose)
+        assert call_args[1]["custom_rules"] == DEFAULT_RULES
+
+        assert "All specifications are valid!" in result.stdout
