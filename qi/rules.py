@@ -1,5 +1,6 @@
 """Rule configuration and management for OpenAPI linting."""
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -8,115 +9,80 @@ import yaml
 from .linter import CustomRule
 
 
-class RuleDefinition:
-    """Definition of a custom rule that can be loaded from configuration."""
-
-    def __init__(self, name: str, description: str, check: dict[str, str]):
-        self.name = name
-        self.description = description
-        self.field = check.get("field", "")
-        self.location = check.get("location", "")
-        self.type = check.get("type", "required-field")
-
-
-def check_path(spec: dict[str, Any], path_parts: list[str], pattern: str, current_path: str = "") -> list[str]:
-    """Recursively check a path in the spec for a pattern."""
-    if not path_parts:
-        # We've reached the target path level, check for the pattern
-        if not isinstance(spec, dict) or pattern not in spec:
-            return [f"Missing required field '{pattern}' in {current_path}"]
-        return []
-
-    errors = []
-    current = path_parts[0]
-    remaining = path_parts[1:]
-
-    if current == "*":
-        if not isinstance(spec, dict):
-            return []
-        # For wildcards, check all children
-        for key, value in spec.items():
-            if value is not None:
-                new_path = f"{current_path}/{key}" if current_path else key
-                errors.extend(check_path(value, remaining, pattern, new_path))
-    else:
-        if not isinstance(spec, dict) or current not in spec:
-            return []
-        value = spec[current]
-        if value is not None:
-            new_path = f"{current_path}/{current}" if current_path else current
-            errors.extend(check_path(value, remaining, pattern, new_path))
-
-    return errors
-
-
-def check_inline_models(spec: dict[str, Any], current_path: str = "") -> list[str]:
-    """Check for inline models in the spec."""
-    errors = []
-
-    if isinstance(spec, dict):
-        # Check if this is a schema definition
-        if "type" in spec and spec["type"] == "object" and "properties" in spec:
-            # This is an inline model
-            if not current_path.startswith("/components/schemas"):
-                errors.append(f"Inline model found at {current_path}")
-
-        # Recursively check all children
-        for key, value in spec.items():
-            new_path = f"{current_path}/{key}" if current_path else key
-            if isinstance(value, dict | list):
-                errors.extend(check_inline_models(value, new_path))
-    elif isinstance(spec, list):
-        # Check array items
-        for i, item in enumerate(spec):
-            if isinstance(item, dict | list):
-                errors.extend(check_inline_models(item, f"{current_path}[{i}]"))
-
-    return errors
-
-
-def create_rule_from_definition(rule_def: RuleDefinition) -> CustomRule:
-    """Create a CustomRule from a RuleDefinition."""
+def create_check_function(rule_config: dict[str, Any]) -> Callable[[dict[str, Any]], list[str]]:
+    """Create a check function from a rule configuration."""
+    check = rule_config["check"]
+    field = check["field"]
+    location = check["location"]
 
     def check_func(spec: dict[str, Any]) -> list[str]:
-        if rule_def.type == "no-inline-models":
-            return check_inline_models(spec)
+        errors = []
+        # Split the location path into parts
+        path_parts = [p for p in location.split("/") if p]
 
-        # Regular field checking
-        path_parts = [p for p in rule_def.location.split("/") if p]
-        return check_path(spec, path_parts, rule_def.field)
+        def check_path(current: dict[str, Any], parts: list[str], current_path: str) -> None:
+            if not parts:
+                # We've reached the target location, check for the field
+                if field not in current:
+                    errors.append(f"Missing required field '{field}' at {current_path}")
+                return
 
-    return CustomRule(
-        name=rule_def.name,
-        description=rule_def.description,
-        check_func=check_func,
-    )
+            part = parts[0]
+            remaining_parts = parts[1:]
+
+            if part == "*":
+                # Wildcard - check all keys
+                for key, value in current.items():
+                    if isinstance(value, dict):
+                        new_path = f"{current_path}/{key}"
+                        check_path(value, remaining_parts, new_path)
+            # Specific key
+            elif part in current and isinstance(current[part], dict):
+                new_path = f"{current_path}/{part}"
+                check_path(current[part], remaining_parts, new_path)
+
+        check_path(spec, path_parts, "")
+        return errors
+
+    return check_func
 
 
-def load_rules_from_config(config_path: Path) -> list[CustomRule]:
-    """Load custom rules from a configuration file.
+def load_custom_rules(rules_file: Path) -> list[CustomRule]:
+    """Load custom rules from a YAML file.
 
-    The configuration file should be in YAML format with the following structure:
-    ```yaml
-    openapi-rules:
-      - rule: my-rule
-        description: My custom rule description
-        check:
-          type: required-field  # or no-inline-models
-          field: required-field  # The field that must exist
-          location: /paths/*/get  # Where to check for the field
-    ```
+    Args:
+        rules_file: Path to the YAML file containing custom rules
+
+    Returns:
+        List of CustomRule objects
+
+    Raises:
+        ValueError: If the rules file is invalid
     """
-    with open(config_path) as f:
-        config = yaml.safe_load(f)
+    try:
+        with open(rules_file) as f:
+            rules_data = yaml.safe_load(f)
+    except Exception as e:
+        raise ValueError(f"Failed to read or parse rules file: {e}") from e
+
+    if not isinstance(rules_data, dict) or "openapi-rules" not in rules_data:
+        raise ValueError("Rules file must contain an 'openapi-rules' list")
 
     rules = []
-    for rule_config in config.get("openapi-rules", []):
-        rule_def = RuleDefinition(
-            name=rule_config["rule"],
-            description=rule_config["description"],
-            check=rule_config["check"],
-        )
-        rules.append(create_rule_from_definition(rule_def))
+    for rule_config in rules_data["openapi-rules"]:
+        if not isinstance(rule_config, dict):
+            continue
+
+        try:
+            rule = CustomRule(
+                name=rule_config["rule"],
+                description=rule_config["description"],
+                check_func=create_check_function(rule_config),
+            )
+            rules.append(rule)
+        except KeyError as e:
+            raise ValueError(f"Invalid rule configuration, missing required field: {e}") from e
+        except Exception as e:
+            raise ValueError(f"Failed to create rule: {e}") from e
 
     return rules

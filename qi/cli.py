@@ -7,7 +7,8 @@ from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn
 
 from .config import Config
 from .generator import OpenAPIGenerator
-from .linter import lint_specs
+from .linter import DEFAULT_RULES, lint_specs
+from .rules import load_custom_rules
 
 console = Console()
 
@@ -173,6 +174,15 @@ def lint(
         file_okay=True,
         resolve_path=True,
     ),
+    rules_file: Path | None = typer.Option(
+        None,
+        "--rules",
+        "-r",
+        help="Path to custom rules YAML file",
+        exists=True,
+        dir_okay=False,
+        file_okay=True,
+    ),
     verbose: bool = typer.Option(
         False,
         "--verbose",
@@ -182,7 +192,10 @@ def lint(
 ):
     """Lint OpenAPI specification files for validation errors."""
     try:
-        is_valid = lint_specs(spec_files, verbose)
+        # Load custom rules if provided, otherwise use default rules
+        custom_rules = load_custom_rules(rules_file) if rules_file else DEFAULT_RULES
+
+        is_valid = lint_specs(spec_files, verbose, custom_rules=custom_rules)
         if is_valid:
             rprint("[bold green]✓[/] All specifications are valid!")
         else:

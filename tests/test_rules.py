@@ -4,166 +4,75 @@ from pathlib import Path
 
 import yaml
 
-from qi.rules import (
-    RuleDefinition,
-    check_inline_models,
-    check_path,
-    create_rule_from_definition,
-    load_rules_from_config,
-)
+from qi.rules import create_check_function, load_custom_rules
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 
-def test_check_path_missing_field():
-    """Test checking path with missing required field."""
-    spec = {"test": {"nested": {}}}
-    errors = check_path(spec, ["test", "nested"], "required_field", "")
-    assert errors == ["Missing required field 'required_field' in test/nested"]
+def test_create_check_function():
+    """Test creating check function from rule configuration."""
+    rule_config = {
+        "check": {
+            "field": "required",
+            "location": "/test/*/field",
+        }
+    }
+    check_func = create_check_function(rule_config)
+
+    # Test with valid spec
+    spec = {"test": {"example": {"field": {"required": True}}}}
+    errors = check_func(spec)
+    assert not errors
+
+    # Test with missing field
+    spec = {"test": {"example": {"field": {}}}}
+    errors = check_func(spec)
+    assert len(errors) == 1
+    assert errors[0] == "Missing required field 'required' at /test/example/field"
 
 
-def test_check_path_wildcard():
-    """Test checking path with wildcard."""
+def test_create_check_function_wildcard():
+    """Test check function with wildcard paths."""
+    rule_config = {
+        "check": {
+            "field": "tags",
+            "location": "/paths/*/get",
+        }
+    }
+    check_func = create_check_function(rule_config)
+
+    # Test with valid spec
     spec = {
         "paths": {
             "/users": {"get": {"tags": ["users"]}},
             "/orders": {"get": {"tags": ["orders"]}},
         }
     }
-    errors = check_path(spec, ["paths", "*", "get"], "tags", "")
-    assert not errors
-
-
-def test_check_path_wildcard_non_dict():
-    """Test checking path with wildcard on non-dict."""
-    spec = {"test": "not-a-dict"}
-    errors = check_path(spec, ["test", "*"], "field", "")
-    assert not errors
-
-
-def test_check_path_missing_intermediate():
-    """Test checking path with missing intermediate key."""
-    spec = {"test": {}}
-    errors = check_path(spec, ["test", "missing", "field"], "required", "")
-    assert not errors
-
-
-def test_check_path_none_value():
-    """Test checking path with None value."""
-    spec = {"test": {"nested": None}}
-    errors = check_path(spec, ["test", "nested", "field"], "required", "")
-    assert not errors
-
-
-def test_check_inline_models_valid():
-    """Test checking for inline models in valid location."""
-    spec = {"components": {"schemas": {"User": {"$ref": "#/components/schemas/BaseModel"}}}}
-    errors = check_inline_models(spec)
-    assert not errors
-
-
-def test_check_inline_models_invalid():
-    """Test checking for inline models in invalid location."""
-    spec = {
-        "paths": {
-            "/test": {
-                "get": {
-                    "responses": {
-                        "200": {
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {
-                                            "id": {"type": "string"},
-                                        },
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    errors = check_inline_models(spec)
-    assert errors
-    assert any("Inline model found at" in error for error in errors)
-
-
-def test_check_inline_models_array():
-    """Test checking for inline models in array."""
-    spec = {
-        "paths": {
-            "/test": {
-                "get": {
-                    "responses": {
-                        "200": {
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "type": "array",
-                                        "items": [
-                                            {
-                                                "type": "object",
-                                                "properties": {
-                                                    "id": {"type": "string"},
-                                                },
-                                            }
-                                        ],
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    errors = check_inline_models(spec)
-    assert errors
-    assert any("Inline model found at" in error for error in errors)
-
-
-def test_create_rule_from_definition():
-    """Test creating rule from definition."""
-    # Create a rule that checks for the presence of a field named "required"
-    rule_def = RuleDefinition(
-        name="test-rule",
-        description="Test rule",
-        check={
-            "type": "required-field",
-            "field": "required",  # We want to check for a field named "required"
-            "location": "test/*",  # Look for the "required" field in objects under test/*
-        },
-    )
-    rule = create_rule_from_definition(rule_def)
-    assert rule.name == "test-rule"
-    assert rule.description == "Test rule"
-
-    # Test the created rule with a spec that has the required field
-    spec = {"test": {"example": {"required": True}}}  # The "required" field exists
-    errors = rule.check_func(spec)
+    errors = check_func(spec)
     assert not errors
 
     # Test with missing field
-    spec = {"test": {"example": {}}}  # The "required" field is missing
-    errors = rule.check_func(spec)
+    spec = {
+        "paths": {
+            "/users": {"get": {}},
+            "/orders": {"get": {"tags": ["orders"]}},
+        }
+    }
+    errors = check_func(spec)
     assert len(errors) == 1
-    assert errors[0] == "Missing required field 'required' in test/example"
+    assert errors[0] == "Missing required field 'tags' at /paths//users/get"
 
 
-def test_load_rules_from_config():
-    """Test loading rules from config file."""
+def test_load_custom_rules():
+    """Test loading custom rules from YAML file."""
     config_data = {
         "openapi-rules": [
             {
                 "rule": "test-rule",
                 "description": "Test rule",
                 "check": {
-                    "type": "required-field",
                     "field": "required",
-                    "location": "test/*/field",
+                    "location": "/test/*/field",
                 },
             }
         ]
@@ -173,9 +82,67 @@ def test_load_rules_from_config():
         yaml.dump(config_data, f)
 
     try:
-        rules = load_rules_from_config(config_file)
+        rules = load_custom_rules(config_file)
         assert len(rules) == 1
         assert rules[0].name == "test-rule"
         assert rules[0].description == "Test rule"
+
+        # Test the loaded rule
+        spec = {"test": {"example": {"field": {"required": True}}}}
+        errors = rules[0].check_func(spec)
+        assert not errors
+    finally:
+        config_file.unlink(missing_ok=True)
+
+
+def test_load_custom_rules_invalid_file():
+    """Test loading custom rules from invalid file."""
+    config_file = FIXTURES_DIR / "nonexistent.yaml"
+    try:
+        load_custom_rules(config_file)
+        raise AssertionError("Should have raised ValueError")
+    except ValueError as e:
+        assert "Failed to read or parse rules file" in str(e)
+
+
+def test_load_custom_rules_invalid_format():
+    """Test loading custom rules with invalid format."""
+    config_data = {"invalid": "format"}
+    config_file = FIXTURES_DIR / "invalid_rules.yaml"
+    with open(config_file, "w") as f:
+        yaml.dump(config_data, f)
+
+    try:
+        load_custom_rules(config_file)
+        raise AssertionError("Should have raised ValueError")
+    except ValueError as e:
+        assert "Rules file must contain an 'openapi-rules' list" in str(e)
+    finally:
+        config_file.unlink(missing_ok=True)
+
+
+def test_load_custom_rules_missing_fields():
+    """Test loading custom rules with missing required fields."""
+    config_data = {
+        "openapi-rules": [
+            {
+                "rule": "test-rule",
+                # Missing description
+                "check": {
+                    "field": "required",
+                    "location": "/test/*/field",
+                },
+            }
+        ]
+    }
+    config_file = FIXTURES_DIR / "missing_fields.yaml"
+    with open(config_file, "w") as f:
+        yaml.dump(config_data, f)
+
+    try:
+        load_custom_rules(config_file)
+        raise AssertionError("Should have raised ValueError")
+    except ValueError as e:
+        assert "Invalid rule configuration, missing required field" in str(e)
     finally:
         config_file.unlink(missing_ok=True)
