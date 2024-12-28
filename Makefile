@@ -5,6 +5,9 @@ PYTHON := python3
 VENV := .venv
 BIN := $(VENV)/bin
 
+# Java artifact variables
+ARTIFACT_PATH ?= playground/out
+
 # Install development dependencies (use this for development)
 install.dev:
 	uv venv
@@ -71,6 +74,10 @@ build: clean
 
 # Run all quality checks
 check: clean lint test
+
+# Run the generated Java application
+run.artifact:
+	cd $(ARTIFACT_PATH) && mvn spring-boot:run
 
 # Default target
 all: clean install.dev lint test 

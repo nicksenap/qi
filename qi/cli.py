@@ -6,6 +6,7 @@ from rich.console import Console
 from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn
 
 from .config import Config
+from .converter import OpenAPIConverter
 from .generator import OpenAPIGenerator
 from .linter import DEFAULT_RULES, lint_specs
 from .rules import load_custom_rules
@@ -147,14 +148,13 @@ def convert(
 ):
     """Convert OpenAPI specification between versions 2 and 3."""
     try:
-        with console.status("[bold green]Loading configuration...") as status:
-            config_obj = Config.load(str(config)) if config else Config.default()
-            generator = OpenAPIGenerator(config_obj)
-            status.update("[bold green]Configuration loaded successfully!")
+        with console.status("[bold green]Initializing converter...") as status:
+            converter = OpenAPIConverter()
+            status.update("[bold green]Converter initialized successfully!")
 
         with create_progress() as progress:
             convert_task = progress.add_task("[cyan]Converting specification...", total=None)
-            output_file = generator.convert_spec_version(
+            output_file = converter.convert_spec_version(
                 str(spec_file),
                 target_version,
                 str(output) if output else None,
