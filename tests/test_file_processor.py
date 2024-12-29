@@ -1,14 +1,36 @@
+import os
+import shutil
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
 
+from qi.config import Config
 from qi.file_operations import ProcessConfig
 from qi.file_processor import FileProcessor
 
 
 @pytest.fixture
-def file_processor():
-    return FileProcessor("test-org", "test-artifact")
+def config():
+    return Config(
+        openapi_generator_version="6.6.0",
+        java_package_base="com.test-org",
+        model_package="model",
+        api_package="api",
+        tracking_file=".qi/tracking.yaml",
+        artifact_id="test-artifact",
+        organization="test-org",
+        artifact_version="0.0.1",
+        use_java8=True,
+        use_spring_boot3=True,
+        use_tags=True,
+        qi_dir=".qi",
+    )
+
+
+@pytest.fixture
+def file_processor(config):
+    return FileProcessor("test-org", "test-artifact", config)
 
 
 @pytest.fixture
@@ -142,3 +164,120 @@ public class TestFile {
     content = test_file.read_text()
     assert "import com.test-org.test-artifact.model.custom.path.TestModel;" in content
     assert "import com.test-org.test-artifact.model.other.path.OtherModel;" in content
+
+
+def test_is_fresh_generation(file_processor, tmp_path):
+    """Test detection of fresh generation."""
+    # Empty directory
+    empty_dir = tmp_path / "empty"
+    empty_dir.mkdir()
+    assert file_processor._is_fresh_generation(str(empty_dir)) is True
+
+    # Non-existent directory
+    non_existent = tmp_path / "non_existent"
+    assert file_processor._is_fresh_generation(str(non_existent)) is True
+
+    # Existing project
+    project_dir = tmp_path / "project"
+    java_path = project_dir / "src/main/java/com/test-org/test-artifact"
+    java_path.mkdir(parents=True)
+    assert file_processor._is_fresh_generation(str(project_dir)) is False
+
+
+def test_has_model_changed(file_processor, tmp_path):
+    """Test detection of model changes."""
+    # Create a test file
+    model_file = tmp_path / "TestModel.java"
+    model_file.write_text("""
+package com.test-org.test-artifact.model;
+public class TestModel {
+    private String name;
+}""")
+
+    # Test with existing model in spec
+    spec_data = {
+        "components": {"schemas": {"TestModel": {"type": "object", "properties": {"name": {"type": "string"}}}}}
+    }
+    assert file_processor._has_model_changed("TestModel", str(model_file), spec_data) is True
+
+    # Test with non-existent file
+    non_existent = tmp_path / "NonExistent.java"
+    assert file_processor._has_model_changed("NonExistent", str(non_existent), spec_data) is True
+
+    # Test with model removed from spec
+    assert file_processor._has_model_changed("RemovedModel", str(model_file), spec_data) is False
+
+
+def test_process_java_files_fresh_generation(file_processor, process_config, setup_test_files):
+    """Test processing Java files for fresh generation."""
+    source_dir, output_dir = setup_test_files
+    process_config.source_dir = str(source_dir)
+    process_config.output_dir = str(output_dir)
+
+    # Remove any existing files to simulate fresh generation
+    shutil.rmtree(output_dir)
+    os.makedirs(output_dir)
+
+    file_processor.process_java_files(process_config)
+
+    # Verify all files were generated
+    custom_path = output_dir / "src/main/java/com/test-org/test-artifact/model/custom/path/TestModel.java"
+    assert custom_path.exists()
+    content = custom_path.read_text()
+    assert "package com.test-org.test-artifact.model.custom.path;" in content
+
+    default_path = output_dir / "src/main/java/com/test-org/test-artifact/model/DefaultModel.java"
+    assert default_path.exists()
+    content = default_path.read_text()
+    assert "package com.test-org.test-artifact.model;" in content
+
+
+def test_process_java_files_existing_project(file_processor, process_config, setup_test_files):
+    """Test processing Java files for existing project."""
+    source_dir, output_dir = setup_test_files
+    process_config.source_dir = str(source_dir)
+    process_config.output_dir = str(output_dir)
+
+    # Create existing files
+    java_path = output_dir / "src/main/java/com/test-org/test-artifact"
+    model_dir = java_path / "model"
+    model_dir.mkdir(parents=True, exist_ok=True)
+
+    # Create the existing model with original content
+    existing_model = model_dir / "ExistingModel.java"
+    existing_content = """package com.test-org.test-artifact.model;
+public class ExistingModel {
+    private String name;
+}"""
+    existing_model.write_text(existing_content)
+
+    # Create source file with updated content
+    source_model = Path(source_dir) / "ExistingModel.java"
+    updated_content = """package com.test-org.test-artifact.model;
+public class ExistingModel {
+    private String name;
+    private String newField;
+}"""
+    source_model.write_text(updated_content)
+
+    # Add existing model to spec with changes
+    process_config.spec_data["components"]["schemas"]["ExistingModel"] = {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "newField": {"type": "string"},  # Added field
+        },
+    }
+
+    file_processor.process_java_files(process_config)
+
+    # Verify existing model was updated (because it changed in spec)
+    assert existing_model.exists()
+    final_content = existing_model.read_text()
+    assert "newField" in final_content  # Check for the new field
+
+    # Verify new models were added
+    custom_path = output_dir / "src/main/java/com/test-org/test-artifact/model/custom/path/TestModel.java"
+    assert custom_path.exists()
+    content = custom_path.read_text()
+    assert "package com.test-org.test-artifact.model.custom.path;" in content

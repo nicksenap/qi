@@ -12,11 +12,14 @@ from .file_processor import FileProcessor, ProcessConfig
 
 
 class OpenAPIGenerator:
+    """Handles OpenAPI code generation and file organization."""
+
     def __init__(self, config: Config):
+        """Initialize generator with configuration."""
         self.config = config
-        os.makedirs(self.config.qi_dir, exist_ok=True)
-        self.tracking_data = self._load_tracking()
-        self.file_processor = FileProcessor(organization=self.config.organization, artifact_id=self.config.artifact_id)
+        self.tracking_data = {}
+        self.file_processor = FileProcessor(config.organization, config.artifact_id, config)
+        self._load_tracking()
 
     def _load_tracking(self) -> dict[str, str]:
         """Load tracking data from file."""
@@ -129,6 +132,7 @@ class OpenAPIGenerator:
         else:
             subprocess.run(cmd, check=True, capture_output=True)
 
+        # Process files based on incremental update setting
         # First, copy all generated files to output directory
         progress.update(task_id, description="[yellow]Copying generated files...")
         os.makedirs(output_dir, exist_ok=True)
@@ -140,13 +144,11 @@ class OpenAPIGenerator:
             else:
                 shutil.copy2(source, destination)
 
-        # Then process model and api files with special handling
+        # Process model files
         progress.update(task_id, description="[yellow]Processing generated files...")
         base_java_path = os.path.join(
             temp_dir, "src/main/java", "com", self.config.organization, self.config.artifact_id
         )
-
-        # Process model files
         model_dir = os.path.join(base_java_path, "model")
         if os.path.exists(model_dir):
             if verbose:

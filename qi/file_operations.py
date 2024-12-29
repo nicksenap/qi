@@ -113,19 +113,59 @@ class PackageUpdater:
 
     def update_package_and_imports(self, content: str, custom_dir: str) -> str:
         """Update package declaration and imports in Java file content."""
-        base_package = f"{self.base_package_root}.model"
-
         if not custom_dir:
             return content
 
-        subpackage = custom_dir.replace("model/", "").replace("/", ".")
-        subpackage = subpackage.strip(".")
-        new_package = f"{base_package}.{subpackage}".replace("..", ".")
+        # Split content into lines for processing
+        lines = content.split("\n")
+        updated_lines = []
 
-        # Only update the package declaration, not the imports
-        content = content.replace(f"package {base_package};", f"package {new_package};")
+        for line in lines:
+            updated_line = line
+            if line.strip().startswith("package "):
+                # Extract the original package name without the semicolon
+                original_package = line.strip()[8:-1]  # Remove 'package ' and ';'
 
-        return content
+                # Convert custom directory path to package format and remove any leading/trailing slashes
+                package_suffix = custom_dir.strip("/").replace("//", "/").replace("/", ".")
+
+                # Split the original package into components
+                package_parts = original_package.split(".")
+
+                # Find the base package (everything up to and including the first occurrence of 'model')
+                model_index = -1
+                for i, part in enumerate(package_parts):
+                    if part == "model":
+                        model_index = i
+                        break
+
+                if model_index != -1:
+                    # Keep everything up to and including the first 'model'
+                    base_package = ".".join(package_parts[:model_index + 1])
+
+                    # Remove any 'model' prefix from the custom directory if it exists
+                    suffix_parts = package_suffix.split(".")
+                    if suffix_parts[0] == "model":
+                        suffix_parts = suffix_parts[1:]
+                    clean_suffix = ".".join(suffix_parts)
+
+                    # Create the new package name
+                    new_package = f"{base_package}.{clean_suffix}" if clean_suffix else base_package
+                else:
+                    # If 'model' is not found, use the original package as base
+                    new_package = f"{original_package}.{package_suffix}"
+
+                updated_line = f"package {new_package};"
+            elif line.strip().startswith("import "):
+                # Update imports to reflect the new package structure
+                import_line = line.strip()
+                if import_line.startswith("import " + self.base_package_root):
+                    for old_part in ["model.model.", ".."]:
+                        import_line = import_line.replace(old_part, ".")
+                updated_line = import_line
+            updated_lines.append(updated_line)
+
+        return "\n".join(updated_lines)
 
 
 class FileMover:
@@ -161,7 +201,14 @@ class FileMover:
         with open(source_path) as f:
             content = f.read()
 
+        # First update the package declaration using PackageUpdater
         content = self.package_updater.update_package_and_imports(content, custom_dir)
+
+        # Then ensure the package name is correct by direct replacement
+        base_package = f"com.{self.organization}.{self.artifact_id}.model"
+        custom_package = custom_dir.strip("/").replace("/", ".")
+        new_package = f"{base_package}.{custom_package}"
+        content = content.replace(f"package {base_package};", f"package {new_package};")
 
         with open(target_path, "w") as f:
             f.write(content)
@@ -175,9 +222,6 @@ class FileMover:
             print(f"Moved and updated file: {file_name}")
 
         # Update tracking
-        base_package = f"com.{self.organization}.{self.artifact_id}.model"
-        custom_package = custom_dir.replace("/", ".")
-        new_package = f"{base_package}.{custom_package}"
         self.tracking_manager.update_tracking(
             model_name,
             {
@@ -189,6 +233,7 @@ class FileMover:
         )
 
         config.progress.update(config.task_id, description=f"[yellow]Moved and updated file: {file_name}")
+        return target_path
 
     def move_to_default_dir(self, source_path: str, file_name: str, config: ProcessConfig, model_name: str):
         """Move and process a file to the default directory."""
@@ -222,3 +267,4 @@ class FileMover:
                 "java_class_name": file_name[:-5],
             },
         )
+        return target_path

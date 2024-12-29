@@ -34,9 +34,27 @@ def generator():
 
 
 @pytest.fixture
-def file_processor():
+def config():
+    return Config(
+        openapi_generator_version="6.6.0",
+        java_package_base="com.qi.service",
+        model_package="model",
+        api_package="api",
+        tracking_file=".qi/tracking.yaml",
+        artifact_id="service",
+        organization="qi",
+        artifact_version="0.0.1",
+        use_java8=True,
+        use_spring_boot3=True,
+        use_tags=True,
+        qi_dir=".qi",
+    )
+
+
+@pytest.fixture
+def file_processor(config):
     """Create a file processor instance."""
-    return FileProcessor(organization="qi", artifact_id="service")
+    return FileProcessor(organization="qi", artifact_id="service", config=config)
 
 
 def test_load_tracking_empty_file(generator, tmp_path):
