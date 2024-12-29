@@ -281,3 +281,180 @@ public class ExistingModel {
     assert custom_path.exists()
     content = custom_path.read_text()
     assert "package com.test-org.test-artifact.model.custom.path;" in content
+
+
+def test_merge_java_files_preserves_custom_code(file_processor, tmp_path):
+    """Test that custom code in method bodies is preserved during merge."""
+    # Create a source file with generated content
+    source_content = """
+package com.test.service.api;
+
+import org.springframework.web.bind.annotation.RequestMapping;
+
+@RequestMapping("/api")
+public class TestApiController implements TestApi {
+    @Override
+    public String getRequest() {
+        return "generated";
+    }
+
+    public void newMethod() {
+        // New method
+    }
+}
+"""
+    source_file = tmp_path / "TestApiController.java"
+    source_file.write_text(source_content)
+
+    # Create a target file with custom modifications
+    target_content = """
+package com.test.service.api;
+
+import org.springframework.web.bind.annotation.RequestMapping;
+
+@RequestMapping("/api")
+public class TestApiController implements TestApi {
+    @Override
+    public String getRequest() {
+        // Custom implementation
+        String customLogic = "custom";
+        return customLogic;
+    }
+}
+"""
+    target_file = tmp_path / "existing" / "TestApiController.java"
+    os.makedirs(target_file.parent)
+    target_file.write_text(target_content)
+
+    # Test the merge
+    merged = file_processor._merge_java_files(str(source_file), str(target_file))
+
+    # Verify that both the custom implementation and new method are present
+    assert 'String customLogic = "custom";' in merged
+    assert "public void newMethod()" in merged
+    assert 'return "generated";' not in merged
+
+
+def test_merge_java_files_handles_missing_target(file_processor, tmp_path):
+    """Test that merge works when target file doesn't exist."""
+    source_content = "public class Test {}"
+    source_file = tmp_path / "Test.java"
+    source_file.write_text(source_content)
+
+    target_file = tmp_path / "nonexistent.java"
+    merged = file_processor._merge_java_files(str(source_file), str(target_file))
+
+    assert merged == source_content
+
+
+def test_merge_java_files_handles_nested_methods(file_processor, tmp_path):
+    """Test that merge correctly handles methods with nested braces."""
+    source_content = """
+public class Test {
+    public void method() {
+        if (true) {
+            System.out.println("generated");
+        }
+    }
+}
+"""
+    target_content = """
+public class Test {
+    public void method() {
+        if (true) {
+            System.out.println("custom");
+        }
+        for (int i = 0; i < 10; i++) {
+            System.out.println(i);
+        }
+    }
+}
+"""
+    source_file = tmp_path / "Test.java"
+    target_file = tmp_path / "existing" / "Test.java"
+
+    os.makedirs(target_file.parent)
+    source_file.write_text(source_content)
+    target_file.write_text(target_content)
+
+    merged = file_processor._merge_java_files(str(source_file), str(target_file))
+
+    assert 'System.out.println("custom")' in merged
+    assert "for (int i = 0; i < 10; i++)" in merged
+    assert 'System.out.println("generated")' not in merged
+
+
+def test_merge_java_files_preserves_controller_implementation(file_processor, tmp_path):
+    """Test that custom implementations in API controllers are preserved."""
+    # Create a source file with generated content
+    source_content = """
+package com.qi.service.api;
+
+import org.springframework.web.context.request.NativeWebRequest;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestMapping;
+import jakarta.annotation.Generated;
+import java.util.Optional;
+
+@Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2024-12-29T21:51:56.816395+01:00[Europe/Stockholm]")
+@Controller
+@RequestMapping("${openapi.merchant.base-path:}")
+public class StorageOrderApiController implements StorageOrderApi {
+
+    private final NativeWebRequest request;
+
+    @Autowired
+    public StorageOrderApiController(NativeWebRequest request) {
+        this.request = request;
+    }
+
+    @Override
+    public Optional<NativeWebRequest> getRequest() {
+        return Optional.ofNullable(request);
+    }
+}
+"""
+    source_file = tmp_path / "StorageOrderApiController.java"
+    source_file.write_text(source_content)
+
+    # Create a target file with custom modifications
+    target_content = """
+package com.qi.service.api;
+
+import org.springframework.web.context.request.NativeWebRequest;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestMapping;
+import jakarta.annotation.Generated;
+import java.util.Optional;
+
+@Generated(value = "org.openapitools.codegen.languages.SpringCodegen", date = "2024-12-29T21:51:25.680854+01:00[Europe/Stockholm]")
+@Controller
+@RequestMapping("${openapi.merchant.base-path:}")
+public class StorageOrderApiController implements StorageOrderApi {
+
+    private final NativeWebRequest request;
+
+    @Autowired
+    public StorageOrderApiController(NativeWebRequest request) {
+        this.request = request;
+    }
+
+    @Override
+    public Optional<NativeWebRequest> getRequest() {
+        System.out.println("request: " + request);
+        return Optional.ofNullable(request);
+    }
+}
+"""
+    target_file = tmp_path / "existing" / "StorageOrderApiController.java"
+    os.makedirs(target_file.parent)
+    target_file.write_text(target_content)
+
+    # Test the merge
+    merged = file_processor._merge_java_files(str(source_file), str(target_file))
+
+    # Verify that the custom implementation is preserved
+    assert 'System.out.println("request: " + request);' in merged
+    assert "return Optional.ofNullable(request);" in merged
+    assert "@Override" in merged
+    assert "public Optional<NativeWebRequest> getRequest()" in merged

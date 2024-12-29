@@ -3,8 +3,11 @@ from pathlib import Path
 
 from .config import Config
 from .file_operations import FileMover, ProcessConfig, TrackingManager
+from .java_parser import JavaParser
 
 
+# TODO: Move from printing to logging
+# TODO: Remove the redudant string based logic since we have the tree-sitter parser
 class FileProcessor:
     """Handles file processing operations for Java files."""
 
@@ -15,6 +18,7 @@ class FileProcessor:
         self.java_package_base = f"com.{organization}.{artifact_id}"
         self.tracking_manager = TrackingManager(organization, artifact_id)
         self.file_mover = FileMover(organization, artifact_id, self.tracking_manager)
+        self.java_parser = JavaParser()
 
     def _get_target_path(self, model_name: str, config: ProcessConfig) -> str:
         """Get the target path for a model."""
@@ -103,7 +107,7 @@ class FileProcessor:
 
         # For now, always return True if model exists in spec and file exists
         # This ensures we update existing models with any potential changes
-        # TODO: Implement proper comparison using tree-sitter
+        # TODO: Implement proper comparison using tree-sitter (have no idea how to do this)
         return True
 
     def _convert_to_pascal_case(self, name: str) -> str:
@@ -245,10 +249,109 @@ class FileProcessor:
             target_path = self.file_mover.move_to_default_dir(source_file, file_name, config, model_name)
         return target_path
 
+    def _find_class_body(self, text: str) -> tuple[int, int]:
+        """Find the start and end of the class body."""
+        class_start = text.find("{")
+        if class_start == -1:
+            return -1, -1
+
+        stack = ["{"]
+        pos = class_start + 1
+
+        while pos < len(text) and stack:
+            char = text[pos]
+            if char == "{":
+                stack.append(char)
+            elif char == "}":
+                stack.pop()
+            pos += 1
+
+        return class_start, pos - 1
+
+    def _extract_methods(self, text: str) -> dict[str, tuple[str, str, str]]:
+        """Extract methods from text.
+
+        Returns:
+            dict mapping method signature to (prefix, body, suffix) where:
+            - prefix is everything before the method body (including '{')
+            - body is the method implementation
+            - suffix is everything after the body (including '}')
+        """
+        methods = {}
+        class_start, class_end = self._find_class_body(text)
+        if class_start == -1:
+            return methods
+
+        class_content = text[class_start:class_end]
+        pos = 0
+        while pos < len(class_content):
+            # Find next method start
+            method_markers = ["@Override", "public", "private", "protected"]
+            next_pos = -1
+            for marker in method_markers:
+                found_pos = class_content.find(marker, pos)
+                if found_pos != -1 and (next_pos == -1 or found_pos < next_pos):
+                    next_pos = found_pos
+
+            if next_pos == -1:
+                break
+
+            pos = next_pos
+            # Find opening brace
+            brace_start = class_content.find("{", pos)
+            if brace_start == -1:
+                break
+
+            # Find method end (handling nested braces)
+            stack = ["{"]
+            current = brace_start + 1
+
+            while current < len(class_content) and stack:
+                if class_content[current] == "{":
+                    stack.append("{")
+                elif class_content[current] == "}":
+                    stack.pop()
+                current += 1
+
+            if not stack:  # Found complete method
+                method_text = class_content[pos:current].strip()
+                # Extract signature (everything before first '{')
+                signature = method_text[: method_text.find("{")].strip()
+                # Clean signature for matching
+                clean_sig = [line.strip() for line in signature.split("\n") if not line.strip().startswith("@")]
+                clean_sig = " ".join(clean_sig)
+
+                body_start = method_text.find("{") + 1
+                body = method_text[body_start:-1].strip()
+                methods[clean_sig] = (method_text[:body_start], body, "}")
+
+            pos = current
+
+        return methods
+
+    def _merge_java_files(self, source_file: str, target_file: str) -> str:
+        """Merge generated Java file with existing file to preserve custom modifications."""
+        return self.java_parser.merge_java_files(source_file, target_file)
+
     def _process_api_file(self, source_file: str, api_name: str, config: ProcessConfig) -> str:
         """Process an API file.
 
         Returns:
             str: The target path where the file was moved to.
         """
+        target_path = os.path.join(
+            config.output_dir,
+            "src/main/java",
+            self.java_package_base.replace(".", "/"),
+            "api",
+            os.path.basename(source_file),
+        )
+
+        # Merge with existing file if it exists
+        merged_content = self._merge_java_files(source_file, target_path)
+
+        # Write merged content to source file
+        with open(source_file, "w") as f:
+            f.write(merged_content)
+
         return self.file_mover.move_to_default_dir(source_file, os.path.basename(source_file), config, api_name)

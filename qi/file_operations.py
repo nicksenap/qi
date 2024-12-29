@@ -141,7 +141,7 @@ class PackageUpdater:
 
                 if model_index != -1:
                     # Keep everything up to and including the first 'model'
-                    base_package = ".".join(package_parts[:model_index + 1])
+                    base_package = ".".join(package_parts[: model_index + 1])
 
                     # Remove any 'model' prefix from the custom directory if it exists
                     suffix_parts = package_suffix.split(".")

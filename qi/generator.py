@@ -11,6 +11,7 @@ from .config import Config
 from .file_processor import FileProcessor, ProcessConfig
 
 
+# TODO: Move from printing to logging
 class OpenAPIGenerator:
     """Handles OpenAPI code generation and file organization."""
 

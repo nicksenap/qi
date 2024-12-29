@@ -49,6 +49,7 @@ test = [
 [tool.ruff]
 line-length = 120
 target-version = "py310"
+fix = true
 
 [tool.ruff.lint]
 select = [
@@ -70,6 +71,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["PLR2004"]  # Ignore magic numbers in tests
+"tests/test_file_processor.py" = ["E501"]
 
 [tool.hatch.version]
 source = "vcs"
